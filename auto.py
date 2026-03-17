@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from numpy import dtype
+from numpy.ma.extras import unique
+
 
 def clean():
     pass
@@ -111,5 +114,50 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
 
 
 
+def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=0.5):
+    if isinstance(df, pd.DataFrame):
+        df_clean = df.copy()
+    else:
+        raise TypeError("Not a dataframe")
+
+    if columns is None:
+        columns = df_clean.columns.tolist()
+
+    report_dict={}
+    total_memory=df_clean.memory_usage(deep=True).sum()
+    total_memory_mb = total_memory / (1024 * 1024)
+    for column in columns:
+        report_dict[column]={'before':df_clean[column].dtype}
+        if pd.api.types.is_integer_dtype(df_clean[column]):
+            col_min=df_clean[column].min()
+            col_max=df_clean[column].max()
+            if col_min>=np.iinfo(np.int8).min and col_max<=np.iinfo(np.int8).max:
+                df_clean[column]=df_clean[column].astype('int8')
+            elif col_min>=np.iinfo(np.int16).min and col_max<=np.iinfo(np.int16).max:
+                df_clean[column]=df_clean[column].astype('int16')
+            elif col_min>=np.iinfo(np.int32).min and col_max<=np.iinfo(np.int32).max:
+                df_clean[column]=df_clean[column].astype('int32')
+
+        elif pd.api.types.is_float_dtype(df_clean[column]):
+            col_min = df_clean[column].min()
+            col_max = df_clean[column].max()
+            if col_min>=np.finfo(np.float32).min and col_max<=np.finfo(np.float32).max:
+                df_clean[column] = df_clean[column].astype('float32')
 
 
+
+        elif pd.api.types.is_object_dtype(df_clean[column]) or pd.api.types.is_string_dtype(df_clean[column]):
+            if convert_category:
+                unique_values=df_clean[column].nunique()
+                total_rows=len(df_clean[column])
+                cardinality_ratio=unique_values/total_rows
+                if cardinality_ratio<cardinality_threshold:
+                    df_clean[column]=df_clean[column].astype('category')
+
+        report_dict[column]['after']=df_clean[column].dtype
+
+    final_total_memory = df_clean.memory_usage(deep=True).sum()
+    final_total_memory_mb = final_total_memory / (1024 * 1024)
+    memory_saved=total_memory_mb-final_total_memory_mb
+    print(f'{total_memory_mb:.2f}-->{final_total_memory_mb:.2f} ({memory_saved:.2f}mb saved)')
+    return df_clean,report_dict
