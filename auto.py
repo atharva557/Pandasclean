@@ -115,6 +115,53 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
 
 
 def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=0.5):
+    """
+    Reduce memory usage of a DataFrame by downcasting numeric dtypes
+    and converting low cardinality string columns to category dtype.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame to optimize.
+
+    columns : list of str, optional
+        Column names to process. If None, all columns are selected automatically.
+
+    convert_category : bool, optional (default=True)
+        Whether to convert low cardinality string/object columns to category dtype.
+        Set to False if you want to skip string columns entirely.
+
+    cardinality_threshold : float, optional (default=0.5)
+        The maximum ratio of unique values to total rows for a string column
+        to be converted to category. For example, 0.5 means a column must have
+        less than 50% unique values to be converted.
+        Lower values are more conservative, higher values are more aggressive.
+
+    Returns
+    -------
+    df_clean : pd.DataFrame
+        Memory optimized copy of the input DataFrame.
+
+    report : dict
+        Maps each column name to a dict with:
+        - 'before' : dtype before optimization
+        - 'after'  : dtype after optimization
+
+    Notes
+    -----
+    - Integer columns are downcast to the smallest safe type (int8 → int16 → int32 → int64)
+    - Float columns are downcast from float64 to float32 where possible. Minor precision loss may occur.
+    - String columns with low cardinality are converted to category dtype which
+      can yield significant memory savings for repetitive string data.
+    - High cardinality string columns (like IDs or emails) are left unchanged
+      as converting them to category would increase memory usage.
+
+    Examples
+    --------
+    >>> df_optimized, report = reduce_memory(df)
+    >>> df_optimized, report = reduce_memory(df, convert_category=False)
+    >>> df_optimized, report = reduce_memory(df, cardinality_threshold=0.3)
+    """
     if isinstance(df, pd.DataFrame):
         df_clean = df.copy()
     else:
@@ -156,8 +203,14 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
 
         report_dict[column]['after']=df_clean[column].dtype
 
+
     final_total_memory = df_clean.memory_usage(deep=True).sum()
     final_total_memory_mb = final_total_memory / (1024 * 1024)
     memory_saved=total_memory_mb-final_total_memory_mb
+    report_dict['summary'] = {
+        'memory_before_mb': round(total_memory_mb, 2),
+        'memory_after_mb': round(final_total_memory_mb, 2),
+        'memory_saved_mb': round(memory_saved, 2)
+    }
     print(f'{total_memory_mb:.2f}-->{final_total_memory_mb:.2f} ({memory_saved:.2f}mb saved)')
     return df_clean,report_dict
