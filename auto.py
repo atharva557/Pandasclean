@@ -214,3 +214,81 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
     }
     print(f'{total_memory_mb:.2f}-->{final_total_memory_mb:.2f} ({memory_saved:.2f}mb saved)')
     return df_clean,report_dict
+
+
+def handle_nan(df, columns=None, strategy='report', fill_value=None, axis='rows', how='any',threshold=None):
+    if isinstance(df, pd.DataFrame):
+        df_clean = df.copy()
+    else:
+        raise TypeError("Not a dataframe")
+    if columns is None:
+        columns = df_clean.columns.tolist()
+
+    report = {
+        'columns': {},
+        'summary': {}
+    }
+    for column in columns:
+        null_count=df_clean[column].isna().sum()
+        null_percentage = (null_count / len(df_clean[column])) * 100
+        null_percentage=round(null_percentage,2)
+        report['columns'][column] = {
+            'null count': null_count,
+            'null percentage': null_percentage
+        }
+    if strategy=='report':
+        return  df_clean,report
+    elif strategy == 'drop':
+        report['summary']['rows before'] = len(df_clean)
+        report['summary']['columns before'] = len(df_clean.columns)
+        if axis=='rows':
+            if threshold:
+                threshold_int = int((threshold / 100) * len(columns))
+                df_clean=df_clean.dropna(thresh=threshold_int)
+            else:
+                df_clean=df_clean.dropna(axis=0,subset=columns,how=how)
+        elif axis=='columns':
+            if threshold:
+                for column in columns:
+                    thresh_limit=report['columns'][column]['null percentage']
+                    if thresh_limit > threshold:
+                        df_clean = df_clean.drop(columns=[column])
+            else:
+                df_clean=df_clean.dropna(axis=1,how=how)
+        report['summary']['rows after'] = len(df_clean)
+        report['summary']['columns after'] = len(df_clean.columns)
+        report['summary']['rows_dropped'] = report['summary']['rows before'] - report['summary']['rows after']
+        report['summary']['columns_dropped'] = report['summary']['columns before'] - report['summary']['columns after']
+        return df_clean,report
+    elif strategy == 'mean':
+        for column in columns:
+            if column in df_clean.select_dtypes(include=['number']).columns:
+                mean=df_clean[column].mean()
+                df_clean[column] = df_clean[column].fillna(mean)
+                report['columns'][column]['action'] = 'filled with mean'
+                report['columns'][column]['fill_value_used'] = round(mean, 2)
+            else:
+                report['columns'][column]['action'] = 'skipped - not numeric'
+        report['summary']['total_values_filled'] = sum(
+            report['columns'][col]['null count']
+            for col in columns
+            if report['columns'][col].get('action') == 'filled with mean'
+        )
+        return df_clean,report
+    elif strategy=='median':
+        for column in columns:
+            if column in df_clean.select_dtypes(include=['number']).columns:
+                median=df_clean[column].median()
+                df_clean[column] = df_clean[column].fillna(median)
+                report['columns'][column]['action'] = 'filled with median'
+                report['columns'][column]['fill_value_used'] = round(median, 2)
+            else:
+                report['columns'][column]['action'] = 'skipped - not numeric'
+        report['summary']['total_values_filled'] = sum(
+            report['columns'][col]['null count']
+            for col in columns
+            if report['columns'][col].get('action') == 'filled with median'
+        )
+        return df_clean,report
+    else:
+        raise ValueError('invalid strategy')
