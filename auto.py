@@ -217,6 +217,77 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
 
 
 def handle_nan(df, columns=None, strategy='report', fill_value=None, axis='rows', how='any',threshold=None):
+    """
+    Handle missing values in a DataFrame using various strategies.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame to process.
+
+    columns : list of str, optional
+        Column names to check for missing values. If None, all columns
+        are selected automatically.
+
+    strategy : str, optional (default='report')
+        How to handle missing values. Options:
+        - 'report' : Return null counts and percentages without making changes.
+        - 'drop'   : Drop rows or columns containing missing values.
+        - 'mean'   : Fill missing values with column mean (numeric columns only).
+        - 'median' : Fill missing values with column median (numeric columns only).
+        - 'custom' : Fill missing values with a user provided value.
+        Any unrecognized strategy raises a ValueError.
+
+    fill_value : scalar or dict, optional (default=None)
+        Only used when strategy='custom'.
+        - Scalar (int, float, str) : Fill all specified columns with this value.
+        - Dict : Maps column names to specific fill values per column.
+        Raises ValueError if None is passed with strategy='custom'.
+
+    axis : str, optional (default='rows')
+        Only used when strategy='drop'. Options:
+        - 'rows'    : Drop rows containing missing values.
+        - 'columns' : Drop columns containing missing values.
+
+    how : str, optional (default='any')
+        Only used when strategy='drop' and threshold is None. Options:
+        - 'any' : Drop if at least one value is NaN.
+        - 'all' : Drop only if all values are NaN.
+
+    threshold : float, optional (default=None)
+        Only used when strategy='drop'.
+        - For axis='rows'    : Minimum percentage of non-NaN values required
+                               to keep a row (0-100).
+        - For axis='columns' : Maximum percentage of NaN values allowed before
+                               a column is dropped (0-100).
+        When provided, overrides the how parameter.
+
+    Returns
+    -------
+    df_clean : pd.DataFrame
+        - 'report' : Original DataFrame unchanged.
+        - 'drop'   : DataFrame with rows or columns removed.
+        - 'mean'   : DataFrame with NaN filled by column mean.
+        - 'median' : DataFrame with NaN filled by column median.
+        - 'custom' : DataFrame with NaN filled by provided value.
+
+    report : dict
+        Contains two keys:
+        - 'columns' : Per column info including null count, null percentage,
+                      action taken, and fill value used where applicable.
+        - 'summary' : Overall stats such as rows/columns dropped or
+                      total values filled depending on strategy used.
+
+    Examples
+    --------
+    >>> df_clean, report = handle_nan(df, strategy='report')
+    >>> df_clean, report = handle_nan(df, strategy='drop', axis='rows', how='any')
+    >>> df_clean, report = handle_nan(df, strategy='drop', axis='columns', threshold=50)
+    >>> df_clean, report = handle_nan(df, columns=['age', 'salary'], strategy='mean')
+    >>> df_clean, report = handle_nan(df, strategy='custom', fill_value=0)
+    >>> df_clean, report = handle_nan(df, strategy='custom', fill_value={'age': 0, 'name': 'unknown'})
+    """
+
     if isinstance(df, pd.DataFrame):
         df_clean = df.copy()
     else:
@@ -290,5 +361,34 @@ def handle_nan(df, columns=None, strategy='report', fill_value=None, axis='rows'
             if report['columns'][col].get('action') == 'filled with median'
         )
         return df_clean,report
+    elif strategy=='custom':
+        if fill_value is None:
+            raise ValueError('must provide fill_value for custom strategy')
+
+        if isinstance(fill_value,dict):
+            for column in columns:
+                if column in fill_value:
+                    df_clean[column] = df_clean[column].fillna(fill_value.get(column))
+                    report['columns'][column]['action'] = 'filled with custom value'
+                    report['columns'][column]['fill_value_used'] = fill_value.get(column)
+                else:
+                    report['columns'][column]['action'] = 'skipped - no fill value provided'
+
+        elif not isinstance(fill_value, dict):
+
+
+            for column in columns:
+                df_clean[column] = df_clean[column].fillna(fill_value)
+                report['columns'][column]['action'] = 'filled with custom value'
+                report['columns'][column]['fill_value_used'] = fill_value
+
+
+        report['summary']['total_values_filled'] = sum(
+            report['columns'][col]['null count']
+            for col in columns
+            if report['columns'][col].get('action') == 'filled with custom value'
+        )
+        return df_clean, report
+
     else:
         raise ValueError('invalid strategy')
