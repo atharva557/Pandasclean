@@ -1,11 +1,20 @@
 import pandas as pd
 import numpy as np
-from numpy import dtype
-from numpy.ma.extras import unique
 
+def auto_clean (df):
+    """
+        Automatically clean a DataFrame by handling missing values,
+        reducing memory usage, and removing outliers using default settings.
+        For custom behaviour, use handle_nan, reduce_memory, and find_outliers directly.
+        """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Not a dataframe")
+    report={}
+    df,report["NaN handling"]=handle_nan(df)
 
-def clean():
-    pass
+    df,report["Memory info"]=reduce_memory(df)
+    df,report['Outliers info']=find_outliers(df,strategy='drop')
+    return df,report
 
 
 
