@@ -8,12 +8,11 @@ def auto_clean (df):
         For custom behaviour, use handle_nan, reduce_memory, and find_outliers directly.
         """
     if not isinstance(df, pd.DataFrame):
-        raise TypeError("Not a dataframe")
+        raise TypeError("df must be a pandas DataFrame")
     report={}
-    df,report["NaN handling"]=handle_nan(df)
-
-    df,report["Memory info"]=reduce_memory(df)
-    df,report['Outliers info']=find_outliers(df,strategy='drop')
+    df, report["NaN handling"] = handle_nan(df, strategy='mean')
+    df, report["Memory info"] = reduce_memory(df)
+    df, report['Outliers info'] = find_outliers(df, strategy='report')
     return df,report
 
 
@@ -64,9 +63,21 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
         >>> df_clean, bounds = find_outliers(df, columns=['age', 'salary'], strategy='drop')
         >>> df_capped, bounds = find_outliers(df, multiplier=3.0, strategy='cap')
         """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas DataFrame")
+
+    if columns is not None and not isinstance(columns, (list, pd.Index)):
+        raise TypeError("columns must be a list or None")
+
+    if not isinstance(multiplier, (int, float)):
+        raise TypeError("multiplier must be a numeric value")
+
+    if not isinstance(strategy, str):
+        raise TypeError("strategy must be a string")
+
     outliers = {}
+
     if multiplier<0:
-        print('multiplier should be positive defaulting to abs of your value')
         multiplier=abs(multiplier)
     if columns is None:
         columns = df.select_dtypes(include=['number']).columns
@@ -89,19 +100,15 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
         return df,outliers
 
     elif strategy == 'drop':
-        mask = pd.Series(True, index=df.index)
+        df_clean = pd.Series(True, index=df.index)
 
         for column in columns:
             if isinstance(outliers[column], tuple):
                 lower_bound = outliers[column][0]
                 upper_bound = outliers[column][1]
 
-                # Update the mask using '&' (bitwise AND)
-                # A row stays True ONLY if it is currently True AND passes this column's check
-                mask = mask & (df[column] >= lower_bound) & (df[column] <= upper_bound)
-
-        # Apply the mask all at once to create the cleaned dataframe
-        df_cleaned = df[mask].copy()
+                df_clean = df_clean & (df[column] >= lower_bound) & (df[column] <= upper_bound)
+        df_cleaned = df[df_clean].copy()
         return df_cleaned, outliers
 
     elif strategy == 'cap':
@@ -118,8 +125,7 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
 
         return df_cleaned, outliers
     else:
-        print('No valid strategy found defaulting to report')
-        return df,outliers
+        raise ValueError("invalid strategy")
 
 
 
@@ -174,7 +180,16 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
     if isinstance(df, pd.DataFrame):
         df_clean = df.copy()
     else:
-        raise TypeError("Not a dataframe")
+        raise TypeError("df must be a pandas DataFrame")
+
+    if columns is not None and not isinstance(columns, (list, pd.Index)):
+        raise TypeError("columns must be a list or None")
+
+    if not isinstance(convert_category, bool):
+        raise TypeError("convert_category must be a boolean")
+
+    if not isinstance(cardinality_threshold, (int, float)):
+        raise TypeError("cardinality_threshold must be a numeric value")
 
     if columns is None:
         columns = df_clean.columns.tolist()
@@ -221,7 +236,7 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
         'memory_after_mb': round(final_total_memory_mb, 2),
         'memory_saved_mb': round(memory_saved, 2)
     }
-    print(f'{total_memory_mb:.2f}-->{final_total_memory_mb:.2f} ({memory_saved:.2f}mb saved)')
+    #print(f'{total_memory_mb:.2f}-->{final_total_memory_mb:.2f} ({memory_saved:.2f}mb saved)')
     return df_clean,report_dict
 
 
@@ -300,7 +315,29 @@ def handle_nan(df, columns=None, strategy='report', fill_value=None, axis='rows'
     if isinstance(df, pd.DataFrame):
         df_clean = df.copy()
     else:
-        raise TypeError("Not a dataframe")
+        raise TypeError("df must be a pandas DataFrame")
+
+    if columns is not None and not isinstance(columns, (list, pd.Index)):
+        raise TypeError("columns must be a list or None")
+
+    if not isinstance(strategy, str):
+        raise TypeError("strategy must be a string")
+
+    if not isinstance(axis, str):
+        raise TypeError("axis must be a string")
+
+    if not isinstance(how, str):
+        raise TypeError("how must be a string")
+
+    if threshold is not None and not isinstance(threshold, (int, float)):
+        raise TypeError("threshold must be a numeric value or None")
+
+    if axis not in ('rows', 'columns'):
+        raise ValueError("axis must be 'rows' or 'columns'")
+
+    if how not in ('any', 'all'):
+        raise ValueError("how must be 'any' or 'all'")
+
     if columns is None:
         columns = df_clean.columns.tolist()
 
