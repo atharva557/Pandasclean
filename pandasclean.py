@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 
+__version__ = '0.1.2'
+__all__ = ['auto_clean', 'find_outliers', 'reduce_memory', 'handle_nan']
+
 def auto_clean (df):
     """
         Automatically clean a DataFrame by handling missing values,
@@ -200,14 +203,22 @@ def reduce_memory(df, columns=None, convert_category=True,cardinality_threshold=
     for column in columns:
         report_dict[column]={'before':df_clean[column].dtype}
         if pd.api.types.is_integer_dtype(df_clean[column]):
-            col_min=df_clean[column].min()
-            col_max=df_clean[column].max()
-            if col_min>=np.iinfo(np.int8).min and col_max<=np.iinfo(np.int8).max:
-                df_clean[column]=df_clean[column].astype('int8')
-            elif col_min>=np.iinfo(np.int16).min and col_max<=np.iinfo(np.int16).max:
-                df_clean[column]=df_clean[column].astype('int16')
-            elif col_min>=np.iinfo(np.int32).min and col_max<=np.iinfo(np.int32).max:
-                df_clean[column]=df_clean[column].astype('int32')
+            col_min = df_clean[column].min()
+            col_max = df_clean[column].max()
+            if df_clean[column].isna().any():
+                if col_min >= np.iinfo(np.int8).min and col_max <= np.iinfo(np.int8).max:
+                    df_clean[column] = df_clean[column].astype('Int8')
+                elif col_min >= np.iinfo(np.int16).min and col_max <= np.iinfo(np.int16).max:
+                    df_clean[column] = df_clean[column].astype('Int16')
+                elif col_min >= np.iinfo(np.int32).min and col_max <= np.iinfo(np.int32).max:
+                    df_clean[column] = df_clean[column].astype('Int32')
+            else:
+                if col_min>=np.iinfo(np.int8).min and col_max<=np.iinfo(np.int8).max:
+                    df_clean[column]=df_clean[column].astype('int8')
+                elif col_min>=np.iinfo(np.int16).min and col_max<=np.iinfo(np.int16).max:
+                    df_clean[column]=df_clean[column].astype('int16')
+                elif col_min>=np.iinfo(np.int32).min and col_max<=np.iinfo(np.int32).max:
+                    df_clean[column]=df_clean[column].astype('int32')
 
         elif pd.api.types.is_float_dtype(df_clean[column]):
             col_min = df_clean[column].min()
