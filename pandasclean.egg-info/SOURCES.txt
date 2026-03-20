@@ -1,8 +1,0 @@
-README.md
-pandasclean.py
-pyproject.toml
-pandasclean.egg-info/PKG-INFO
-pandasclean.egg-info/SOURCES.txt
-pandasclean.egg-info/dependency_links.txt
-pandasclean.egg-info/requires.txt
-pandasclean.egg-info/top_level.txt
