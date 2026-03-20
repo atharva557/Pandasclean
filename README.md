@@ -39,7 +39,7 @@ pip install pandasclean
 
 ### Auto Clean
 
-Runs all cleaning functions in the correct order with default settings.
+Runs all cleaning functions in the correct order with sensible defaults.
 
 ```python
 from pandasclean import auto_clean
@@ -119,7 +119,32 @@ df_optimized, report = reduce_memory(df, convert_category=False)
 df_optimized, report = reduce_memory(df, cardinality_threshold=0.3)
 ```
 
-> On a 1.5 million row DataFrame, memory reduction of 75%+ is typical.
+#### Benchmarks
+
+Tested on a 1.5 million row DataFrame with mixed dtypes:
+
+| Column | Before | After | Notes |
+|--------|--------|-------|-------|
+| `Account_ID` | `int64` | `int32` | Downcast |
+| `Customer_Age` | `int64` | `int8` | Downcast |
+| `Account_Balance` | `float64` | `float32` | Downcast |
+| `Monthly_Spend` | `float64` | `float32` | Downcast |
+| `Credit_Score` | `float64` | `float32` | Downcast |
+| `Activity_Metric_1` | `float64` | `float32` | Downcast |
+| `Activity_Metric_2` | `float64` | `float32` | Downcast |
+| `Tier` | `object` | `category` | Low cardinality |
+
+```python
+before = df.memory_usage(deep=True).sum() / (1024 * 1024)
+df_optimized, report = reduce_memory(df)
+after = df_optimized.memory_usage(deep=True).sum() / (1024 * 1024)
+
+# Before: 152.71 MB
+# After:  37.19 MB
+# Reduction: 75.6%
+```
+
+> Always use `memory_usage(deep=True)` for accurate measurement — pandas default undercounts string column memory.
 
 ---
 
@@ -191,6 +216,14 @@ Standard multiplier values:
 
 ---
 
+## Use Cases
+
+- **Data cleaning before analysis** — handle outliers and NaN values in one step
+- **Memory optimization before ML training** — reduce DataFrame size before fitting models, especially useful for GPU training where float32 is standard
+- **CSV/Parquet compression** — smaller dtypes mean smaller files on disk. Saving to parquet after running `reduce_memory` can reduce file sizes significantly
+
+---
+
 ## Roadmap
 
 - [x] Outlier detection and handling (IQR method)
@@ -198,7 +231,9 @@ Standard multiplier values:
 - [x] NaN handling (drop, mean, median, custom)
 - [x] Auto clean
 - [ ] Z-score based outlier detection
-- [ ] Consistency improvements across functions
+- [ ] Skewness detection and fixing
+- [ ] Duplicate detection and removal
+- [ ] HTML report generator
 
 ---
 
