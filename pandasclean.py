@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 
-__version__ = '0.1.2'
-__all__ = ['auto_clean', 'find_outliers', 'reduce_memory', 'handle_nan']
+__version__ = '0.1.3'
+__all__ = ['auto_clean', 'find_outliers', 'find_outliers_zscore', 'reduce_memory', 'handle_nan']
 
 def auto_clean (df):
     """
@@ -121,6 +121,127 @@ def find_outliers(df, columns=None, multiplier=1.5, strategy='report'):
             if isinstance(outliers[column], tuple):
                 lower_bound = outliers[column][0]
                 upper_bound = outliers[column][1]
+                df_cleaned[column] = df_cleaned[column].astype(float)
+
+                df_cleaned.loc[df_cleaned[column] > upper_bound, column] = upper_bound
+                df_cleaned.loc[df_cleaned[column] < lower_bound, column] = lower_bound
+
+        return df_cleaned, outliers
+    else:
+        raise ValueError("invalid strategy")
+
+
+
+def find_outliers_zscore(df, columns=None, threshold=3.0, strategy='report'):
+    """
+        Detect and handle outliers in a DataFrame using the Z-score method.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The input DataFrame to analyze.
+
+        columns : list of str, optional
+            Column names to check for outliers. If None, all numeric
+            columns are selected automatically.
+
+        threshold : float, optional (default=3.0)
+            The Z-score threshold used to define outliers.
+            Values with an absolute Z-score greater than this threshold
+            are considered outliers.
+            Common values are 2.0 (aggressive) and 3.0 (conservative).
+            Negative values are automatically converted to their absolute value.
+
+        strategy : str, optional (default='report')
+            How to handle detected outliers. Options:
+            - 'report' : Return the original DataFrame and the outlier info
+                         dict without making any changes.
+            - 'drop'   : Remove rows where any value falls outside the computed
+                         Z-score threshold. Uses a single combined mask for efficiency.
+            - 'cap'    : Clip outlier values to mean ± (threshold × std)
+                         instead of removing the row.
+            Any unrecognized strategy raises a ValueError.
+
+        Returns
+        -------
+        df_result : pd.DataFrame
+            - 'report' : Original DataFrame (unmodified).
+            - 'drop'   : Cleaned DataFrame with outlier rows removed.
+            - 'cap'    : DataFrame with outlier values clipped to bounds.
+
+        outliers : dict
+            Maps each column name to one of:
+            - dict with 'mean', 'std', 'lower_bound', 'upper_bound',
+              and 'outlier_count' : valid numeric results.
+            - str : reason the column was skipped (non-numeric, zero std, etc.)
+
+        Examples
+        --------
+        >>> df_out, info = find_outliers_zscore(df, strategy='report')
+        >>> df_clean, info = find_outliers_zscore(df, columns=['age', 'salary'], strategy='drop')
+        >>> df_capped, info = find_outliers_zscore(df, threshold=2.0, strategy='cap')
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("df must be a pandas DataFrame")
+
+    if columns is not None and not isinstance(columns, (list, pd.Index)):
+        raise TypeError("columns must be a list or None")
+
+    if not isinstance(threshold, (int, float)):
+        raise TypeError("threshold must be a numeric value")
+
+    if not isinstance(strategy, str):
+        raise TypeError("strategy must be a string")
+
+    outliers = {}
+
+    if threshold<0:
+        threshold=abs(threshold)
+    if columns is None:
+        columns = df.select_dtypes(include=['number']).columns
+
+    for column in columns:
+        if pd.api.types.is_numeric_dtype(df[column]):
+            mean = df[column].mean()
+            std = df[column].std()
+            if std == 0:
+                outliers[column] = "Std is 0 (Constant or near-constant data)"
+                continue
+            lower_bound = mean - (threshold * std)
+            upper_bound = mean + (threshold * std)
+            outlier_count = ((df[column] < lower_bound) | (df[column] > upper_bound)).sum()
+            outliers[column] = {
+                'mean': round(mean, 4),
+                'std': round(std, 4),
+                'lower_bound': round(lower_bound, 4),
+                'upper_bound': round(upper_bound, 4),
+                'outlier_count': int(outlier_count)
+            }
+        else:
+            outliers[column] = "Is not a numeric data type"
+
+    if strategy == 'report':
+        return df,outliers
+
+    elif strategy == 'drop':
+        mask = pd.Series(True, index=df.index)
+
+        for column in columns:
+            if isinstance(outliers[column], dict):
+                lower_bound = outliers[column]['lower_bound']
+                upper_bound = outliers[column]['upper_bound']
+
+                mask = mask & (df[column] >= lower_bound) & (df[column] <= upper_bound)
+        df_cleaned = df[mask].copy()
+        return df_cleaned, outliers
+
+    elif strategy == 'cap':
+        df_cleaned = df.copy()
+
+        for column in columns:
+            if isinstance(outliers[column], dict):
+                lower_bound = outliers[column]['lower_bound']
+                upper_bound = outliers[column]['upper_bound']
                 df_cleaned[column] = df_cleaned[column].astype(float)
 
                 df_cleaned.loc[df_cleaned[column] > upper_bound, column] = upper_bound

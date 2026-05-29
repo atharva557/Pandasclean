@@ -1,9 +1,9 @@
-# pandasclean
+# pandasclean [![Downloads](https://pepy.tech/badge/pandasclean)](https://pepy.tech/project/pandasclean)
+
 
 A lightweight Python library for cleaning and optimizing pandas DataFrames. Built for data analysts and data scientists who want practical, no-fuss data cleaning with sensible defaults.
 
 ---
-
 ## Quick Start
 
 ```python
@@ -20,7 +20,8 @@ That's it. One line cleans your entire DataFrame.
 
 ## Features
 
-- **Outlier Detection & Handling** — Detect outliers using the IQR method and choose to report, drop, or cap them
+- **Outlier Detection & Handling (IQR)** — Detect outliers using the IQR method and choose to report, drop, or cap them
+- **Outlier Detection & Handling (Z-score)** — Detect outliers using the Z-score method and choose to report, drop, or cap them
 - **Memory Reduction** — Automatically downcast numeric dtypes and convert low cardinality string columns to save memory
 - **NaN Handling** — Drop, fill with mean/median, or supply custom fill values per column
 - **Auto Clean** — One function that runs everything with sensible defaults
@@ -67,6 +68,26 @@ df_clean, bounds = find_outliers(df, strategy='cap')
 
 # Target specific columns with a custom multiplier
 df_clean, bounds = find_outliers(df, columns=['age', 'salary'], multiplier=3.0, strategy='cap')
+```
+
+---
+
+### Z-score Outlier Detection & Handling
+
+```python
+from pandasclean import find_outliers_zscore
+
+# Report outlier info without changing data
+df, info = find_outliers_zscore(df, strategy='report')
+
+# Drop rows containing outliers
+df_clean, info = find_outliers_zscore(df, strategy='drop')
+
+# Cap outliers to mean ± (threshold × std)
+df_clean, info = find_outliers_zscore(df, strategy='cap')
+
+# Target specific columns with a custom threshold
+df_clean, info = find_outliers_zscore(df, columns=['age', 'salary'], threshold=2.0, strategy='cap')
 ```
 
 ---
@@ -168,6 +189,17 @@ Standard multiplier values:
 - `1.5` — mild outliers (default)
 - `3.0` — extreme outliers only
 
+### Z-score Outlier Detection
+
+Uses the Z-score method to compute bounds:
+- `z_score = (value - mean) / std`
+- `lower_bound = mean - (threshold × std)`
+- `upper_bound = mean + (threshold × std)`
+
+Standard threshold values:
+- `2.0` — aggressive (catches more outliers)
+- `3.0` — conservative (default, catches extreme outliers only)
+
 ---
 
 ## Parameters
@@ -187,6 +219,17 @@ Standard multiplier values:
 | `df` | required | Input DataFrame |
 | `columns` | `None` | Columns to check. Defaults to all numeric columns |
 | `multiplier` | `1.5` | IQR multiplier. Use `3.0` for extreme outliers only |
+| `strategy` | `'report'` | One of `'report'`, `'drop'`, `'cap'` |
+
+---
+
+### `find_outliers_zscore(df, columns, threshold, strategy)`
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `df` | required | Input DataFrame |
+| `columns` | `None` | Columns to check. Defaults to all numeric columns |
+| `threshold` | `3.0` | Z-score threshold. Use `2.0` for more aggressive detection |
 | `strategy` | `'report'` | One of `'report'`, `'drop'`, `'cap'` |
 
 ---
@@ -230,12 +273,25 @@ Standard multiplier values:
 - [x] Memory reduction (dtype downcasting + category conversion)
 - [x] NaN handling (drop, mean, median, custom)
 - [x] Auto clean
-- [ ] Z-score based outlier detection
+- [x] Z-score based outlier detection
 - [ ] Skewness detection and fixing
 - [ ] Duplicate detection and removal
 - [ ] HTML report generator
 
 ---
+
+## Contributing
+
+We welcome contributions! If you want to help improve `pandasclean`, please consider the following:
+
+1. **Reporting Bugs**: Open an issue on GitHub to report any bugs or any unexpected behavior.
+2. **Running Tests**: Ensure that your changes are covered by tests. You can run them using:
+   ```bash
+   python -m unittest tests.py
+   python -m unittest discover
+   ```
+3. **Pull Requests**: When submitting a PR, please provide a clear description of your changes and ensure that the tests pass.
+4. **Documentation**: If you add a new feature, please also update the documentation.
 
 ## License
 
